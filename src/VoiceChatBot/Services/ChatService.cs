@@ -12,6 +12,7 @@ namespace VoiceChatBot.Services;
 public interface IChatService
 {
     Task<string> GetChatResponseAsync(string userMessage);
+    Task<string> GetChatResponseAsync(string userMessage, string language);
     void ClearChatHistory();
     IEnumerable<ChatMessage> GetChatHistory();
 }
@@ -135,6 +136,133 @@ public class ChatService : IChatService
                     else
                     {
                         // Try to get choices property
+                        var choicesProperty = responseType.GetProperty("Choices");
+                        if (choicesProperty != null)
+                        {
+                            var choices = choicesProperty.GetValue(chatCompletions);
+                            _logger.LogInformation("Choices found: {Choices}", choices);
+                        }
+                    }
+                }
+            }
+            catch (Exception innerEx)
+            {
+                _logger.LogWarning(innerEx, "Error parsing response content");
+            }
+
+            // Add assistant response to history
+            _chatHistory.Add(new ChatMessage("Assistant", assistantMessage, DateTime.UtcNow));
+
+            _logger.LogInformation("Chat response generated successfully");
+            return assistantMessage;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error generating chat response");
+            var errorMessage = "I'm sorry, I'm having trouble right now. Could you please try again?";
+            _chatHistory.Add(new ChatMessage("Assistant", errorMessage, DateTime.UtcNow));
+            return errorMessage;
+        }
+    }
+
+    public async Task<string> GetChatResponseAsync(string userMessage, string language)
+    {
+        try
+        {
+            _logger.LogInformation("Processing chat message: {Message} in language: {Language}", userMessage, language);
+            _logger.LogInformation("Using model deployment: {Model}", _modelDeploymentName);
+
+            // Add user message to history
+            _chatHistory.Add(new ChatMessage("User", userMessage, DateTime.UtcNow));
+
+            // Get language display name for the system message
+            var languageNames = new Dictionary<string, string>
+            {
+                ["en-US"] = "English",
+                ["en-GB"] = "English",
+                ["es-ES"] = "Spanish",
+                ["es-MX"] = "Spanish",
+                ["fr-FR"] = "French",
+                ["de-DE"] = "German",
+                ["it-IT"] = "Italian",
+                ["pt-BR"] = "Portuguese",
+                ["zh-CN"] = "Chinese",
+                ["ja-JP"] = "Japanese",
+                ["ko-KR"] = "Korean",
+                ["ar-SA"] = "Arabic",
+                ["hi-IN"] = "Hindi",
+                ["ru-RU"] = "Russian",
+                ["sk-SK"] = "Slovak",
+                ["cs-CZ"] = "Czech"
+            };
+
+            var languageDisplayName = languageNames.GetValueOrDefault(language, "the requested language");
+
+            // Prepare chat messages for the API with language context
+            var messages = new List<ChatRequestMessage>
+            {
+                new ChatRequestSystemMessage($"You are a helpful AI assistant. Please respond in {languageDisplayName}. Keep responses concise and conversational since they will be spoken aloud."),
+            };
+
+            // Add recent chat history (last 10 messages to keep context manageable)
+            var recentHistory = _chatHistory.TakeLast(10);
+            foreach (var msg in recentHistory)
+            {
+                if (msg.Role == "User")
+                    messages.Add(new ChatRequestUserMessage(msg.Content));
+                else if (msg.Role == "Assistant")
+                    messages.Add(new ChatRequestAssistantMessage(msg.Content));
+            }
+
+            // Create chat completion request
+            var chatRequest = new ChatCompletionsOptions
+            {
+                Model = _modelDeploymentName, // Use configured deployment name
+                MaxTokens = 150,  // Keep responses concise for speech
+                Temperature = 0.7f
+            };
+
+            foreach (var message in messages)
+            {
+                chatRequest.Messages.Add(message);
+            }
+
+            _logger.LogInformation("Sending request to AI Foundry with {MessageCount} messages", messages.Count);
+
+            // Get response from AI Foundry
+            var response = await _chatClient.CompleteAsync(chatRequest);
+            var chatCompletions = response.Value;
+            
+            _logger.LogInformation("Response received from AI Foundry");
+            
+            // Extract the actual content from the response (using same logic as original method)
+            string assistantMessage = "I'm sorry, I couldn't generate a response.";
+            
+            try
+            {
+                if (chatCompletions != null)
+                {
+                    _logger.LogInformation("Response type: {Type}", chatCompletions.GetType().Name);
+                    
+                    var responseType = chatCompletions.GetType();
+                    var properties = responseType.GetProperties();
+                    
+                    foreach (var prop in properties)
+                    {
+                        _logger.LogInformation("Available property: {PropertyName} of type {PropertyType}", prop.Name, prop.PropertyType.Name);
+                    }
+                    
+                    var contentProperty = responseType.GetProperty("Content");
+                    if (contentProperty != null)
+                    {
+                        var content = contentProperty.GetValue(chatCompletions)?.ToString();
+                        if (!string.IsNullOrEmpty(content))
+                        {
+                            assistantMessage = content;
+                        }
+                    }
+                    else
+                    {
                         var choicesProperty = responseType.GetProperty("Choices");
                         if (choicesProperty != null)
                         {

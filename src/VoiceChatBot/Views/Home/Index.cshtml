@@ -18,6 +18,21 @@
                         </div>
                     </div>
 
+                    <!-- Language Selection -->
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label for="languageSelect" class="form-label">🌍 Language:</label>
+                            <select id="languageSelect" class="form-select">
+                                <option value="en-US">Loading languages...</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6 d-flex align-items-end">
+                            <div id="languageStatus" class="text-muted small">
+                                Current: English (US)
+                            </div>
+                        </div>
+                    </div>
+
                     <!-- Controls -->
                     <div class="d-flex gap-2 mb-3">
                         <button id="voiceChatBtn" class="btn btn-primary flex-fill">
@@ -56,8 +71,11 @@
                 this.isListening = false;
                 this.isRecording = false;
                 this.recognition = null;
+                this.currentLanguage = 'en-US';
+                this.supportedLanguages = {};
                 this.initializeElements();
                 this.attachEventListeners();
+                this.loadSupportedLanguages();
                 this.loadChatHistory();
                 this.initializeSpeechRecognition();
             }
@@ -70,12 +88,15 @@
                 this.sendTextBtn = document.getElementById('sendTextBtn');
                 this.status = document.getElementById('status');
                 this.audioPlayer = document.getElementById('audioPlayer');
+                this.languageSelect = document.getElementById('languageSelect');
+                this.languageStatus = document.getElementById('languageStatus');
             }
 
             attachEventListeners() {
                 this.voiceChatBtn.addEventListener('click', () => this.toggleVoiceRecording());
                 this.clearHistoryBtn.addEventListener('click', () => this.clearHistory());
                 this.sendTextBtn.addEventListener('click', () => this.sendTextMessage());
+                this.languageSelect.addEventListener('change', () => this.changeLanguage());
                 this.messageInput.addEventListener('keypress', (e) => {
                     if (e.key === 'Enter') this.sendTextMessage();
                 });
@@ -87,7 +108,7 @@
                     this.recognition = new SpeechRecognition();
                     this.recognition.continuous = false;
                     this.recognition.interimResults = false;
-                    this.recognition.lang = 'en-US';
+                    this.recognition.lang = this.currentLanguage;
 
                     this.recognition.onstart = () => {
                         this.isRecording = true;
@@ -177,7 +198,10 @@
                         headers: {
                             'Content-Type': 'application/json'
                         },
-                        body: JSON.stringify({ message: transcript })
+                        body: JSON.stringify({ 
+                            message: transcript,
+                            language: this.currentLanguage
+                        })
                     });
 
                     if (!response.ok) {
@@ -218,7 +242,10 @@
                         headers: {
                             'Content-Type': 'application/json'
                         },
-                        body: JSON.stringify({ text: text })
+                        body: JSON.stringify({ 
+                            text: text,
+                            language: this.currentLanguage
+                        })
                     });
 
                     console.log('Text-to-speech response status:', response.status);
@@ -274,6 +301,74 @@
                     }
                 } catch (error) {
                     console.error('Error playing speech:', error);
+                }
+            }
+
+            async loadSupportedLanguages() {
+                try {
+                    const response = await fetch('/api/speech/languages');
+                    if (response.ok) {
+                        const data = await response.json();
+                        this.supportedLanguages = data.supportedLanguages;
+                        this.currentLanguage = data.currentLanguage;
+                        
+                        // Populate language select
+                        this.languageSelect.innerHTML = '';
+                        for (const [code, name] of Object.entries(this.supportedLanguages)) {
+                            const option = document.createElement('option');
+                            option.value = code;
+                            option.textContent = name;
+                            option.selected = code === this.currentLanguage;
+                            this.languageSelect.appendChild(option);
+                        }
+                        
+                        this.updateLanguageStatus();
+                    }
+                } catch (error) {
+                    console.error('Error loading supported languages:', error);
+                }
+            }
+
+            async changeLanguage() {
+                const selectedLanguage = this.languageSelect.value;
+                if (selectedLanguage === this.currentLanguage) return;
+
+                try {
+                    this.setStatus('🌍 Changing language...');
+                    
+                    const response = await fetch('/api/speech/language', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ language: selectedLanguage })
+                    });
+
+                    if (response.ok) {
+                        const data = await response.json();
+                        this.currentLanguage = data.currentLanguage;
+                        this.updateLanguageStatus();
+                        this.updateSpeechRecognitionLanguage();
+                        this.setStatus('✅ Language changed successfully');
+                        setTimeout(() => this.setStatus('Ready'), 2000);
+                    } else {
+                        throw new Error('Failed to change language');
+                    }
+                } catch (error) {
+                    console.error('Error changing language:', error);
+                    this.setStatus('❌ Error changing language');
+                    setTimeout(() => this.setStatus('Ready'), 3000);
+                }
+            }
+
+            updateLanguageStatus() {
+                const languageName = this.supportedLanguages[this.currentLanguage] || this.currentLanguage;
+                this.languageStatus.textContent = `Current: ${languageName}`;
+            }
+
+            updateSpeechRecognitionLanguage() {
+                if (this.recognition) {
+                    this.recognition.lang = this.currentLanguage;
                 }
             }
 
@@ -345,7 +440,10 @@
                         headers: {
                             'Content-Type': 'application/json'
                         },
-                        body: JSON.stringify({ message })
+                        body: JSON.stringify({ 
+                            message,
+                            language: this.currentLanguage
+                        })
                     });
 
                     if (!response.ok) {

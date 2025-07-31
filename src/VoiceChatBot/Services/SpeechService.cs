@@ -12,12 +12,18 @@ public interface ISpeechService
     Task<string> ConvertSpeechToTextAsync(byte[] audioData);
     Task<string> ConvertSpeechToTextAsync(); // Overload for microphone input
     Task<byte[]> ConvertTextToSpeechAsync(string text);
+    Task<byte[]> ConvertTextToSpeechAsync(string text, string language);
+    void SetLanguage(string language);
+    string GetCurrentLanguage();
+    Dictionary<string, string> GetSupportedLanguages();
 }
 
 public class SpeechService : ISpeechService
 {
     private readonly SpeechConfig _speechConfig;
     private readonly ILogger<SpeechService> _logger;
+    private readonly Dictionary<string, LanguageConfig> _supportedLanguages;
+    private string _currentLanguage = "en-US";
 
     public SpeechService(IConfiguration configuration, ILogger<SpeechService> logger)
     {
@@ -33,10 +39,57 @@ public class SpeechService : ISpeechService
         }
 
         _speechConfig = SpeechConfig.FromSubscription(speechKey, speechRegion);
-        _speechConfig.SpeechRecognitionLanguage = "en-US";
-        _speechConfig.SpeechSynthesisVoiceName = "en-US-AvaMultilingualNeural";
+        
+        // Initialize supported languages with their voice configurations
+        _supportedLanguages = new Dictionary<string, LanguageConfig>
+        {
+            ["en-US"] = new("en-US", "English (US)", "en-US-AvaMultilingualNeural"),
+            ["en-GB"] = new("en-GB", "English (UK)", "en-GB-SoniaNeural"),
+            ["es-ES"] = new("es-ES", "Spanish (Spain)", "es-ES-ElviraNeural"),
+            ["es-MX"] = new("es-MX", "Spanish (Mexico)", "es-MX-DaliaNeural"),
+            ["fr-FR"] = new("fr-FR", "French (France)", "fr-FR-DeniseNeural"),
+            ["de-DE"] = new("de-DE", "German (Germany)", "de-DE-KatjaNeural"),
+            ["it-IT"] = new("it-IT", "Italian (Italy)", "it-IT-ElsaNeural"),
+            ["pt-BR"] = new("pt-BR", "Portuguese (Brazil)", "pt-BR-FranciscaNeural"),
+            ["zh-CN"] = new("zh-CN", "Chinese (Mandarin)", "zh-CN-XiaoxiaoNeural"),
+            ["ja-JP"] = new("ja-JP", "Japanese", "ja-JP-NanamiNeural"),
+            ["ko-KR"] = new("ko-KR", "Korean", "ko-KR-SunHiNeural"),
+            ["ar-SA"] = new("ar-SA", "Arabic (Saudi Arabia)", "ar-SA-ZariyahNeural"),
+            ["hi-IN"] = new("hi-IN", "Hindi (India)", "hi-IN-SwaraNeural"),
+            ["ru-RU"] = new("ru-RU", "Russian", "ru-RU-SvetlanaNeural"),
+            ["sk-SK"] = new("sk-SK", "Slovak", "sk-SK-ViktoriaNeural"),
+            ["cs-CZ"] = new("cs-CZ", "Czech", "cs-CZ-VlastaNeural")
+        };
+        
+        SetLanguage(_currentLanguage);
         
         _logger.LogInformation("Speech service initialized with region: {Region}", speechRegion);
+    }
+
+    public void SetLanguage(string language)
+    {
+        if (_supportedLanguages.ContainsKey(language))
+        {
+            _currentLanguage = language;
+            var config = _supportedLanguages[language];
+            _speechConfig.SpeechRecognitionLanguage = config.LanguageCode;
+            _speechConfig.SpeechSynthesisVoiceName = config.VoiceName;
+            _logger.LogInformation("Language changed to: {Language} ({DisplayName})", language, config.DisplayName);
+        }
+        else
+        {
+            _logger.LogWarning("Unsupported language: {Language}. Using default: {Default}", language, _currentLanguage);
+        }
+    }
+
+    public string GetCurrentLanguage() => _currentLanguage;
+
+    public Dictionary<string, string> GetSupportedLanguages()
+    {
+        return _supportedLanguages.ToDictionary(
+            kvp => kvp.Key,
+            kvp => kvp.Value.DisplayName
+        );
     }
 
     public async Task<string> ConvertSpeechToTextAsync(byte[] audioData)
@@ -151,11 +204,24 @@ public class SpeechService : ISpeechService
 
     public async Task<byte[]> ConvertTextToSpeechAsync(string text)
     {
+        return await ConvertTextToSpeechAsync(text, _currentLanguage);
+    }
+
+    public async Task<byte[]> ConvertTextToSpeechAsync(string text, string language)
+    {
         try
         {
-            _logger.LogInformation("Converting text to speech: {Text}", text);
+            _logger.LogInformation("Converting text to speech: {Text} in language: {Language}", text, language);
 
-            using var speechSynthesizer = new SpeechSynthesizer(_speechConfig);
+            // Create a temporary speech config for this specific language if different from current
+            SpeechConfig speechConfig = _speechConfig;
+            if (language != _currentLanguage && _supportedLanguages.ContainsKey(language))
+            {
+                speechConfig = SpeechConfig.FromSubscription(_speechConfig.SubscriptionKey, _speechConfig.Region);
+                speechConfig.SpeechSynthesisVoiceName = _supportedLanguages[language].VoiceName;
+            }
+
+            using var speechSynthesizer = new SpeechSynthesizer(speechConfig);
             var result = await speechSynthesizer.SpeakTextAsync(text);
 
             if (result.Reason == ResultReason.SynthesizingAudioCompleted)
@@ -176,3 +242,5 @@ public class SpeechService : ISpeechService
         }
     }
 }
+
+public record LanguageConfig(string LanguageCode, string DisplayName, string VoiceName);

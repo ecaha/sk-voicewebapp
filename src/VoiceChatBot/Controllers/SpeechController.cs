@@ -65,13 +65,62 @@ public class SpeechController : ControllerBase
                 return BadRequest(new { error = "Text cannot be empty" });
             }
 
-            var audioBytes = await _speechService.ConvertTextToSpeechAsync(request.Text);
+            var audioBytes = string.IsNullOrEmpty(request.Language) 
+                ? await _speechService.ConvertTextToSpeechAsync(request.Text)
+                : await _speechService.ConvertTextToSpeechAsync(request.Text, request.Language);
+            
             return File(audioBytes, "audio/wav", "speech.wav");
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error converting text to speech");
             return StatusCode(500, new { error = "An error occurred during text-to-speech conversion" });
+        }
+    }
+
+    [HttpGet("languages")]
+    public IActionResult GetSupportedLanguages()
+    {
+        try
+        {
+            var languages = _speechService.GetSupportedLanguages();
+            var currentLanguage = _speechService.GetCurrentLanguage();
+            
+            return Ok(new
+            {
+                supportedLanguages = languages,
+                currentLanguage = currentLanguage
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting supported languages");
+            return StatusCode(500, new { error = "An error occurred while fetching supported languages" });
+        }
+    }
+
+    [HttpPost("language")]
+    public IActionResult SetLanguage([FromBody] SetLanguageRequest request)
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(request.Language))
+            {
+                return BadRequest(new { error = "Language cannot be empty" });
+            }
+
+            _speechService.SetLanguage(request.Language);
+            
+            return Ok(new
+            {
+                message = "Language updated successfully",
+                currentLanguage = _speechService.GetCurrentLanguage()
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error setting language");
+            return StatusCode(500, new { error = "An error occurred while setting language" });
         }
     }
 
@@ -100,6 +149,12 @@ public class SpeechController : ControllerBase
 public class TextToSpeechRequest
 {
     public string Text { get; set; } = string.Empty;
+    public string? Language { get; set; }
+}
+
+public class SetLanguageRequest
+{
+    public string Language { get; set; } = string.Empty;
 }
 
 public class VoiceChatResponse

@@ -26,7 +26,10 @@ public class ChatController : ControllerBase
                 return BadRequest(new { error = "Message cannot be empty" });
             }
 
-            var response = await _chatService.GetChatResponseAsync(request.Message);
+            var response = string.IsNullOrEmpty(request.Language) 
+                ? await _chatService.GetChatResponseAsync(request.Message)
+                : await _chatService.GetChatResponseAsync(request.Message, request.Language);
+            
             return Ok(new ChatResponse { Message = response });
         }
         catch (Exception ex)
@@ -70,6 +73,7 @@ public class ChatController : ControllerBase
 public class ChatRequest
 {
     public string Message { get; set; } = string.Empty;
+    public string? Language { get; set; }
 }
 
 public class ChatResponse
