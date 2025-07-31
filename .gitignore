@@ -1,0 +1,178 @@
+# .NET
+bin/
+obj/
+out/
+*.user
+*.suo
+*.cache
+*.docstates
+[Dd]ebug/
+[Rr]elease/
+[Bb]uild/
+[Bb]in/
+[Oo]bj/
+[Ll]og/
+[Ll]ogs/
+
+# Visual Studio / Visual Studio Code
+.vs/
+.vscode/
+*.sln.docstates
+*.userprefs
+*.pidb
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+[Aa]uto[Gg]enerated.cs
+
+# Application Settings with Secrets
+appsettings.json
+appsettings.*.json
+!appsettings.Development.json.template
+!appsettings.Production.json.template
+
+# Azure and Terraform
+.azure/
+*.tfstate
+*.tfstate.*
+.terraform/
+.terraform.lock.hcl
+terraform.tfvars
+terraform.tfvars.json
+*.tfvars
+
+# User-specific files
+*.rsuser
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# Build results
+[Dd]ebug/
+[Dd]ebugPublic/
+[Rr]elease/
+[Rr]eleases/
+x64/
+x86/
+[Aa][Rr][Mm]/
+[Aa][Rr][Mm]64/
+bld/
+[Bb]in/
+[Oo]bj/
+[Ll]og/
+[Ll]ogs/
+
+# NuGet Packages
+*.nupkg
+*.snupkg
+packages/
+!packages/build/
+**/packages/*
+!**/packages/build/
+
+# NuGet v3's project.json files produces more ignorable files
+*.nuget.props
+*.nuget.targets
+
+# Microsoft Azure Build Output
+csx/
+*.build.csdef
+
+# Microsoft Azure Emulator
+ecf/
+rcf/
+
+# Windows Azure Packaging
+*.azzproj
+
+# Visual Studio cache files
+*.suo
+*.user
+*.sln.docstates
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.temp
+*~
+
+# Log files
+*.log
+
+# Package files
+*.zip
+*.tar.gz
+*.rar
+
+# IDE files
+.idea/
+*.swp
+*.swo
+*~
+
+# Local development environment
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Azure Functions
+local.settings.json
+
+# Secrets and keys
+secrets.json
+*.key
+*.pem
+*.p12
+*.pfx
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Node modules (if any)
+node_modules/
+
+# Publish profiles
+PublishProfiles/
+*.pubxml
+*.publishproj
+
+# Web publish settings
+**/Properties/PublishProfiles/
+
+# MSTest test Results
+[Tt]est[Rr]esult*/
+[Bb]uild[Ll]og.*
+
+# JetBrains Rider
+.idea/
+*.sln.iml
+
+# CodeRush personal settings
+.cr/personal
+
+# Python (if any Python scripts)
+__pycache__/
+*.py[cod]
+*$py.class
+
+# JupyterLab
+.jupyter/
+*.ipynb_checkpoints/
+
+# Backup files
+*.bak
+*.backup

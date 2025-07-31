@@ -1,0 +1,2 @@
+# Semnatic Kernel Voice chat
+Simple web app demostrating AI foundry capability to support Speech to text, chat and Text to Speech. Web app was created by Copilot in Agentic mode by Claude Sonnet4 model. As the input s in copilotinstruction.txt file was used. It had to be little tuned in the end, mostly still by the copilot.

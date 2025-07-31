@@ -1,0 +1,27 @@
+You are a professional Azure Cloud and AI developer.
+
+Ground Rules>
+* Infrastructure is written in Terraform. Whenever possible, use native providers (azurerm). If an Azure resource cannot be deployed by azurerm, use azapi.
+* For application development, use C#. Do not put everything in one file; separate code into multiple files when it makes sense.
+* Always document your solution in Markdown. When appropriate, include architecture diagrams in Mermaid in the documentation.
+* Always follow KISS (Keep It Simple, Stupid); prefer clarity over brevity.
+
+General Project Description>
+You are developing a sample application for Semantic Kernel. It will be a simple chatbot. The emphasis will be on the bot’s speech capability—users will be able to ask questions via microphone, and answers will be played back through speakers.
+
+Detailed Instructions>
+* For the backend infrastructure, create an AI Foundry project with GPT-4o model; for TTS and STT, utilize the standard Speech Cognitive endpoints that are already part of the AI Foundry project.
+    You will deploy only>
+        Ai foundry resource
+        AI foundry project
+        resource group
+    Use output to output endpoints and api keys
+* The frontend will be a web application (.NET Core MVC).
+* The frontend will feature a simple, read-only chat window where users can observe the conversation in text form.
+* Include a microphone icon that allows users to interact with the bot by speech.
+* User speech will be converted to text and displayed in the chat window.
+* The agent’s response (from the GPT-4o model) will appear in the window and be played back to the user through speech synthesis.
+* Do not use OpenAI endpoints
+* Hints
+** for TTS and STT use Microsoft.CognitiveServices.Speech
+** use AI foundry project to get agent chat client

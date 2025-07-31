@@ -1,0 +1,409 @@
+﻿@{
+    ViewData["Title"] = "Voice Chat Bot";
+}
+
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="text-center mb-0">🎤 Voice Chat Bot</h2>
+                    <p class="text-center text-muted mb-0">Speak with AI using your voice</p>
+                </div>
+                <div class="card-body">
+                    <!-- Chat History -->
+                    <div id="chatHistory" class="border rounded p-3 mb-3" style="height: 400px; overflow-y: auto; background-color: #f8f9fa;">
+                        <div class="text-center text-muted">
+                            <p>Welcome! Click the microphone button to start speaking, or type your message below.</p>
+                        </div>
+                    </div>
+
+                    <!-- Controls -->
+                    <div class="d-flex gap-2 mb-3">
+                        <button id="voiceChatBtn" class="btn btn-primary flex-fill">
+                            <i class="bi bi-mic"></i> Start Voice Chat
+                        </button>
+                        <button id="clearHistoryBtn" class="btn btn-outline-secondary">
+                            <i class="bi bi-trash"></i> Clear
+                        </button>
+                    </div>
+
+                    <!-- Text Input -->
+                    <div class="input-group">
+                        <input type="text" id="messageInput" class="form-control" placeholder="Type your message here..." />
+                        <button id="sendTextBtn" class="btn btn-success">
+                            <i class="bi bi-send"></i> Send
+                        </button>
+                    </div>
+
+                    <!-- Status -->
+                    <div id="status" class="mt-2 text-center">
+                        <small class="text-muted">Ready</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Audio element for playing responses -->
+<audio id="audioPlayer" controls style="width: 100%; margin: 10px 0;"></audio>
+
+@section Scripts {
+    <script>
+        class VoiceChatBot {
+            constructor() {
+                this.isListening = false;
+                this.isRecording = false;
+                this.recognition = null;
+                this.initializeElements();
+                this.attachEventListeners();
+                this.loadChatHistory();
+                this.initializeSpeechRecognition();
+            }
+
+            initializeElements() {
+                this.chatHistory = document.getElementById('chatHistory');
+                this.voiceChatBtn = document.getElementById('voiceChatBtn');
+                this.clearHistoryBtn = document.getElementById('clearHistoryBtn');
+                this.messageInput = document.getElementById('messageInput');
+                this.sendTextBtn = document.getElementById('sendTextBtn');
+                this.status = document.getElementById('status');
+                this.audioPlayer = document.getElementById('audioPlayer');
+            }
+
+            attachEventListeners() {
+                this.voiceChatBtn.addEventListener('click', () => this.toggleVoiceRecording());
+                this.clearHistoryBtn.addEventListener('click', () => this.clearHistory());
+                this.sendTextBtn.addEventListener('click', () => this.sendTextMessage());
+                this.messageInput.addEventListener('keypress', (e) => {
+                    if (e.key === 'Enter') this.sendTextMessage();
+                });
+            }
+
+            initializeSpeechRecognition() {
+                if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+                    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+                    this.recognition = new SpeechRecognition();
+                    this.recognition.continuous = false;
+                    this.recognition.interimResults = false;
+                    this.recognition.lang = 'en-US';
+
+                    this.recognition.onstart = () => {
+                        this.isRecording = true;
+                        this.isListening = true;
+                        this.updateVoiceButton();
+                        this.setStatus('🎤 Listening... Speak now or click to stop');
+                    };
+
+                    this.recognition.onresult = (event) => {
+                        const transcript = event.results[0][0].transcript;
+                        this.handleVoiceInput(transcript);
+                    };
+
+                    this.recognition.onerror = (event) => {
+                        console.error('Speech recognition error:', event.error);
+                        this.stopRecording();
+                        this.setStatus(`❌ Speech recognition error: ${event.error}`);
+                        setTimeout(() => this.setStatus('Ready'), 3000);
+                    };
+
+                    this.recognition.onend = () => {
+                        this.stopRecording();
+                    };
+                } else {
+                    console.warn('Speech recognition not supported in this browser');
+                    this.setStatus('⚠️ Speech recognition not supported in this browser');
+                }
+            }
+
+            toggleVoiceRecording() {
+                if (!this.recognition) {
+                    this.setStatus('⚠️ Speech recognition not available');
+                    return;
+                }
+
+                if (this.isRecording) {
+                    this.stopRecording();
+                } else {
+                    this.startRecording();
+                }
+            }
+
+            startRecording() {
+                if (!this.recognition || this.isRecording) return;
+
+                try {
+                    this.recognition.start();
+                    this.setStatus('🎤 Starting recording...');
+                } catch (error) {
+                    console.error('Error starting recording:', error);
+                    this.setStatus('❌ Error starting recording');
+                }
+            }
+
+            stopRecording() {
+                if (this.recognition && this.isRecording) {
+                    this.recognition.stop();
+                }
+                this.isRecording = false;
+                this.isListening = false;
+                this.updateVoiceButton();
+                this.setStatus('🛑 Recording stopped');
+            }
+
+            updateVoiceButton() {
+                if (this.isRecording) {
+                    this.voiceChatBtn.innerHTML = '<i class="bi bi-stop-circle"></i> Stop Recording';
+                    this.voiceChatBtn.classList.remove('btn-primary');
+                    this.voiceChatBtn.classList.add('btn-danger');
+                } else {
+                    this.voiceChatBtn.innerHTML = '<i class="bi bi-mic"></i> Start Voice Chat';
+                    this.voiceChatBtn.classList.remove('btn-danger');
+                    this.voiceChatBtn.classList.add('btn-primary');
+                }
+            }
+
+            async handleVoiceInput(transcript) {
+                try {
+                    this.setStatus('💭 Processing your message...');
+                    
+                    // Add user message to chat immediately
+                    this.addMessageToChat('User', transcript);
+                    
+                    // Send to AI for response
+                    const response = await fetch('/api/chat/message', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ message: transcript })
+                    });
+
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                    }
+
+                    const result = await response.json();
+                    
+                    // Add AI response to chat
+                    this.addMessageToChat('Assistant', result.message);
+                    
+                    // Convert AI response to speech
+                    await this.speakText(result.message);
+                    
+                    this.setStatus('✅ Voice chat completed');
+                    
+                } catch (error) {
+                    console.error('Voice chat error:', error);
+                    this.setStatus(`❌ Error: ${error.message}`);
+                    this.addMessageToChat('Assistant', 'Sorry, I had trouble processing your voice message.');
+                } finally {
+                    setTimeout(() => this.setStatus('Ready'), 3000);
+                }
+            }
+
+            async speakText(text) {
+                try {
+                    console.log('Starting text-to-speech for:', text);
+                    
+                    // Stop any currently playing audio
+                    if (!this.audioPlayer.paused) {
+                        this.audioPlayer.pause();
+                        this.audioPlayer.currentTime = 0;
+                    }
+
+                    const response = await fetch('/api/speech/text-to-speech', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ text: text })
+                    });
+
+                    console.log('Text-to-speech response status:', response.status);
+
+                    if (response.ok) {
+                        const audioBlob = await response.blob();
+                        console.log('Audio blob size:', audioBlob.size, 'type:', audioBlob.type);
+                        
+                        const audioUrl = URL.createObjectURL(audioBlob);
+                        console.log('Audio URL created:', audioUrl);
+                        
+                        return new Promise((resolve, reject) => {
+                            // Clear any existing event handlers
+                            this.audioPlayer.onended = null;
+                            this.audioPlayer.onerror = null;
+                            
+                            // Set new event handlers
+                            this.audioPlayer.onended = () => {
+                                console.log('Audio playback ended');
+                                URL.revokeObjectURL(audioUrl);
+                                this.audioPlayer.onended = null;
+                                this.audioPlayer.onerror = null;
+                                resolve();
+                            };
+                            this.audioPlayer.onerror = (error) => {
+                                console.error('Audio playback error:', error);
+                                URL.revokeObjectURL(audioUrl);
+                                this.audioPlayer.onended = null;
+                                this.audioPlayer.onerror = null;
+                                reject(error);
+                            };
+                            
+                            // Set volume to maximum
+                            this.audioPlayer.volume = 1.0;
+                            this.audioPlayer.src = audioUrl;
+                            
+                            console.log('Starting audio playback...');
+                            this.audioPlayer.play().then(() => {
+                                console.log('Audio play() promise resolved');
+                            }).catch((playError) => {
+                                console.error('Audio play() failed:', playError);
+                                // Try to handle autoplay policy issues
+                                if (playError.name === 'NotAllowedError') {
+                                    console.log('Autoplay blocked. User interaction required.');
+                                    alert('Click OK to enable audio playback');
+                                    return this.audioPlayer.play();
+                                }
+                                reject(playError);
+                            });
+                        });
+                    } else {
+                        console.error('Text-to-speech request failed:', response.statusText);
+                    }
+                } catch (error) {
+                    console.error('Error playing speech:', error);
+                }
+            }
+
+            async loadChatHistory() {
+                try {
+                    const response = await fetch('/api/chat/history');
+                    if (response.ok) {
+                        const history = await response.json();
+                        this.displayChatHistory(history);
+                    }
+                } catch (error) {
+                    console.error('Error loading chat history:', error);
+                }
+            }
+
+            displayChatHistory(history) {
+                if (history.length === 0) {
+                    this.chatHistory.innerHTML = `
+                        <div class="text-center text-muted">
+                            <p>Welcome! Click the microphone button to start speaking, or type your message below.</p>
+                        </div>
+                    `;
+                    return;
+                }
+
+                this.chatHistory.innerHTML = '';
+                history.forEach(msg => this.addMessageToChat(msg.role, msg.content));
+            }
+
+            addMessageToChat(role, content) {
+                const messageDiv = document.createElement('div');
+                messageDiv.className = `mb-3 ${role === 'User' ? 'text-end' : 'text-start'}`;
+                
+                const isUser = role === 'User';
+                const bgClass = isUser ? 'bg-primary text-white' : 'bg-light';
+                const icon = isUser ? '👤' : '🤖';
+                
+                messageDiv.innerHTML = `
+                    <div class="d-inline-block p-3 rounded ${bgClass}" style="max-width: 70%;">
+                        <div class="fw-bold mb-1">${icon} ${role}</div>
+                        <div>${this.escapeHtml(content)}</div>
+                        <small class="opacity-75">${new Date().toLocaleTimeString()}</small>
+                    </div>
+                `;
+                
+                this.chatHistory.appendChild(messageDiv);
+                this.chatHistory.scrollTop = this.chatHistory.scrollHeight;
+            }
+
+            escapeHtml(text) {
+                const div = document.createElement('div');
+                div.textContent = text;
+                return div.innerHTML;
+            }
+
+
+
+            async sendTextMessage() {
+                const message = this.messageInput.value.trim();
+                if (!message) return;
+
+                try {
+                    this.setStatus('💭 Thinking...');
+                    this.sendTextBtn.disabled = true;
+                    this.messageInput.value = '';
+
+                    const response = await fetch('/api/chat/message', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ message })
+                    });
+
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                    }
+
+                    const result = await response.json();
+                    
+                    this.addMessageToChat('User', message);
+                    this.addMessageToChat('Assistant', result.message);
+                    
+                    this.setStatus('✅ Message sent');
+                    
+                } catch (error) {
+                    console.error('Text message error:', error);
+                    this.setStatus(`❌ Error: ${error.message}`);
+                } finally {
+                    this.sendTextBtn.disabled = false;
+                    setTimeout(() => this.setStatus('Ready'), 3000);
+                }
+            }
+
+            async clearHistory() {
+                try {
+                    const response = await fetch('/api/chat/clear', { method: 'POST' });
+                    if (response.ok) {
+                        this.chatHistory.innerHTML = `
+                            <div class="text-center text-muted">
+                                <p>Chat history cleared. Ready for a new conversation!</p>
+                            </div>
+                        `;
+                        this.setStatus('✅ History cleared');
+                    }
+                } catch (error) {
+                    console.error('Clear history error:', error);
+                    this.setStatus('❌ Error clearing history');
+                } finally {
+                    setTimeout(() => this.setStatus('Ready'), 2000);
+                }
+            }
+
+            setStatus(message) {
+                this.status.innerHTML = `<small class="text-muted">${message}</small>`;
+            }
+        }
+
+        // Initialize the voice chat bot when the page loads
+        document.addEventListener('DOMContentLoaded', () => {
+            new VoiceChatBot();
+        });
+    </script>
+}
+
+@{
+    ViewData["Title"] = "Home Page";
+}
+
+<div class="text-center">
+    <h1 class="display-4">Welcome</h1>
+    <p>Learn about <a href="https://learn.microsoft.com/aspnet/core">building Web apps with ASP.NET Core</a>.</p>
+</div>

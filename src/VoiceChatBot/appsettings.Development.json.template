@@ -1,0 +1,18 @@
+{
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information",
+      "Microsoft.AspNetCore": "Warning"
+    }
+  },
+  "AllowedHosts": "*",
+  "AzureAI": {
+    "Endpoint": "https://your-ai-foundry-project.services.ai.azure.com/models",
+    "ApiKey": "your-api-key-here",
+    "ModelDeploymentName": "gpt-4o"
+  },
+  "AzureSpeech": {
+    "SubscriptionKey": "your-speech-subscription-key-here",
+    "Region": "your-azure-region-here"
+  }
+}
